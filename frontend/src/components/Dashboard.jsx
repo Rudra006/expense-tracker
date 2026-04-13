@@ -1,18 +1,13 @@
 import StatsCards from './StatsCards';
 import CategoryBarChart from './charts/CategoryBarChart';
 import SpendingTrendChart from './charts/SpendingTrendChart';
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
-}
+import ExpenseList from './ExpenseList';
 
 function SkeletonCard({ height = 260 }) {
   return <div className="skeleton" style={{ height, borderRadius: 10 }} />;
 }
 
-export default function Dashboard({ expenses, loading, onNavigate }) {
+export default function Dashboard({ expenses, loading, onNavigate, onEdit, onDelete }) {
   const recent = [...expenses]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
@@ -39,7 +34,7 @@ export default function Dashboard({ expenses, loading, onNavigate }) {
         : <StatsCards expenses={expenses} />
       }
 
-      {/* Charts row */}
+      {/* Charts */}
       <div className="charts-grid">
         <div className="card">
           <div className="card-header">
@@ -70,46 +65,14 @@ export default function Dashboard({ expenses, loading, onNavigate }) {
             </button>
           )}
         </div>
-
-        {loading ? (
-          <SkeletonCard height={120} />
-        ) : recent.length === 0 ? (
-          <div className="table-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
-              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-              <rect x="9" y="3" width="6" height="4" rx="1" />
-            </svg>
-            <p>No expenses yet.</p>
-            <button className="btn-primary" onClick={() => onNavigate('add')}>
-              Add your first expense
-            </button>
-          </div>
-        ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Description</th>
-                  <th className="right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((e) => (
-                  <tr key={e.id}>
-                    <td><span className="date-text">{formatDate(e.date)}</span></td>
-                    <td><span className="pill">{e.category}</span></td>
-                    <td className="desc-cell">{e.description}</td>
-                    <td className="right amount">
-                      ₹{parseFloat(e.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="card-divider" style={{ margin: '0 0 0 0' }} />
+        <ExpenseList
+          expenses={recent}
+          loading={loading}
+          error={null}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       </div>
     </div>
   );

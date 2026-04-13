@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { fetchExpenses } from './api/expenses';
+import { fetchExpenses, deleteExpense } from './api/expenses';
 import AuthPage from './components/auth/AuthPage';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseList from './components/ExpenseList';
 import FilterSort from './components/FilterSort';
+import EditExpenseModal from './components/EditExpenseModal';
 
 const PAGE_TITLES = { dashboard: 'Dashboard', expenses: 'Expenses', add: 'Add Expense' };
 
-/* ── Authenticated shell ── */
 function AppShell() {
   const { user, logout } = useAuth();
 
@@ -21,6 +21,7 @@ function AppShell() {
   const [error,          setError]          = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sort,           setSort]           = useState('date_desc');
+  const [editingExpense, setEditingExpense] = useState(null); // expense being edited
 
   const loadExpenses = useCallback(async () => {
     setLoading(true); setError('');
@@ -54,9 +55,23 @@ function AppShell() {
     [visibleExpenses]
   );
 
+  // ── CRUD handlers ──
+
   const handleCreated = useCallback((newExpense) => {
     setAllExpenses((prev) => [newExpense, ...prev]);
     setActivePage('expenses');
+  }, []);
+
+  const handleUpdated = useCallback((updatedExpense) => {
+    setAllExpenses((prev) =>
+      prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e))
+    );
+    setEditingExpense(null);
+  }, []);
+
+  const handleDelete = useCallback(async (id) => {
+    await deleteExpense(id);
+    setAllExpenses((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
   const handleNavigate = useCallback((page) => {
@@ -76,7 +91,7 @@ function AppShell() {
       />
 
       <div className="main-content">
-        {/* ── Top bar ── */}
+        {/* ── Topbar ── */}
         <header className="topbar">
           <button className="topbar-menu-btn" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -102,16 +117,16 @@ function AppShell() {
         {/* ── Pages ── */}
         <div className="page-wrapper">
 
-          {/* Dashboard */}
           {activePage === 'dashboard' && (
             <Dashboard
               expenses={allExpenses}
               loading={loading}
               onNavigate={handleNavigate}
+              onEdit={setEditingExpense}
+              onDelete={handleDelete}
             />
           )}
 
-          {/* Expenses — filter + table unified in one card */}
           {activePage === 'expenses' && (
             <div className="page">
               <div className="page-header">
@@ -128,7 +143,6 @@ function AppShell() {
               </div>
 
               <div className="card full-card">
-                {/* Toolbar row: filters + totals */}
                 <div className="card-toolbar">
                   <FilterSort
                     categories={categories}
@@ -146,19 +160,18 @@ function AppShell() {
                     </span>
                   </div>
                 </div>
-
                 <div className="card-divider" />
-
                 <ExpenseList
                   expenses={visibleExpenses}
                   loading={loading}
                   error={error}
+                  onEdit={setEditingExpense}
+                  onDelete={handleDelete}
                 />
               </div>
             </div>
           )}
 
-          {/* Add Expense */}
           {activePage === 'add' && (
             <div className="page page--centered">
               <div className="page-header">
@@ -173,11 +186,19 @@ function AppShell() {
 
         </div>
       </div>
+
+      {/* ── Edit modal — rendered at root so it overlays everything ── */}
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          onSave={handleUpdated}
+          onClose={() => setEditingExpense(null)}
+        />
+      )}
     </div>
   );
 }
 
-/* ── Root: auth gate ── */
 function Root() {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <AppShell /> : <AuthPage />;

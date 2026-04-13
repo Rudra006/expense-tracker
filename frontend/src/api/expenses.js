@@ -16,7 +16,6 @@ async function request(path, { headers: extraHeaders, ...rest } = {}) {
   });
 
   if (res.status === 401) {
-    // Token expired or invalid — force re-login
     localStorage.removeItem('et_token');
     localStorage.removeItem('et_user');
     window.location.reload();
@@ -47,4 +46,15 @@ export function createExpense(data, idempotencyKey) {
     headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(data),
   });
+}
+
+export function updateExpense(id, data) {
+  return request(`/expenses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteExpense(id) {
+  return request(`/expenses/${id}`, { method: 'DELETE' });
 }

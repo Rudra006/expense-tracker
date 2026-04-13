@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Expense = require('../models/Expense');
 const requireAuth = require('../middleware/auth');
@@ -17,6 +18,10 @@ function parseAmountToPaise(raw) {
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isValidId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +94,73 @@ router.get('/', async (req, res, next) => {
 
     const expenses = await Expense.find(filter).sort(sortOrder);
     return res.json(expenses.map((e) => e.toPublicJSON()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /expenses/:id  — update an expense (user-scoped)
+// ---------------------------------------------------------------------------
+router.put('/:id', async (req, res, next) => {
+  try {
+    if (!isValidId(req.params.id)) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const expense = await Expense.findOne({ _id: req.params.id, userId: req.userId });
+    if (!expense) return res.status(404).json({ error: 'Expense not found' });
+
+    const { amount, category, description, date } = req.body;
+
+    if (amount !== undefined) {
+      const amountPaise = parseAmountToPaise(amount);
+      if (amountPaise === null) {
+        return res.status(400).json({ error: 'amount must be a positive number' });
+      }
+      expense.amount = amountPaise;
+    }
+
+    if (category !== undefined) {
+      const cat = String(category).trim();
+      if (!cat) return res.status(400).json({ error: 'category cannot be empty' });
+      expense.category = cat;
+    }
+
+    if (description !== undefined) {
+      const desc = String(description).trim();
+      if (!desc) return res.status(400).json({ error: 'description cannot be empty' });
+      expense.description = desc;
+    }
+
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: 'date is not a valid ISO date' });
+      }
+      expense.date = parsedDate;
+    }
+
+    await expense.save();
+    return res.json(expense.toPublicJSON());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /expenses/:id  — delete an expense (user-scoped)
+// ---------------------------------------------------------------------------
+router.delete('/:id', async (req, res, next) => {
+  try {
+    if (!isValidId(req.params.id)) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const expense = await Expense.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    if (!expense) return res.status(404).json({ error: 'Expense not found' });
+
+    return res.json({ message: 'Expense deleted successfully', id: req.params.id });
   } catch (err) {
     next(err);
   }
